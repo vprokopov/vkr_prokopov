@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Drift Vision Assistant</title>
+    <link rel="stylesheet" href="./style.css?v=2">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<header class="app-header">
+    <div>
+        <h1>Drift Vision Assistant</h1>
+        <p>Система автоматизированного анализа дрифт-заездов</p>
+    </div>
+
+    <nav>
+        <a href="#upload">Загрузка</a>
+        <a href="#results">Результаты</a>
+        <a href="#trajectory">Траектория</a>
+        <a href="#limitations">Ограничения</a>
+    </nav>
+</header>
+
+<main class="page">
+
+    <section class="hero">
+        <div>
+            <span class="badge">ВКР / практическая часть</span>
+            <h2>Демонстрационный веб-прототип помощника оценки дрифт-заезда</h2>
+            <p>
+                Приложение принимает видеозапись, выполняет обработку кадров,
+                определяет движение автомобиля, строит траекторию и рассчитывает
+                демонстрационные оценочные показатели.
+            </p>
+        </div>
+    </section>
+
+    <section id="upload" class="card">
+        <div class="section-title">
+            <span>1</span>
+            <h2>Загрузка видеозаписи</h2>
+        </div>
+
+        <p class="hint">
+            Загрузите видео дрифт-заезда для запуска анализа движения автомобиля.
+        </p>
+
+        <div class="upload-panel">
+            <div class="upload-left">
+                <label class="file-upload-card" id="dropZone" for="videoInput">
+                    <input type="file" id="videoInput" accept="video/*" onchange="showSelectedFile()">
+        
+                    <div class="file-icon">MP4</div>
+        
+                    <div class="file-meta">
+                        <div id="fileName" class="file-name">Файл не выбран</div>
+                        <div id="fileSize" class="file-size">Перетащите видео сюда или выберите файл</div>
+                    </div>
+                </label>
+        
+                <div class="processing-row">
+                    <div class="processing-left">
+                        <div id="loader" class="loader hidden">
+                            <span></span>
+                        </div>
+        
+                        <span id="statusText" class="status-text status-idle">
+                            Не загружен
+                        </span>
+                    </div>
+                </div>
+            </div>
+        
+            <div class="upload-actions">
+                <button id="analyzeBtn" onclick="analyzeVideo()" disabled>
+                    Запустить анализ
+                </button>
+            
+                <button type="button" class="secondary-button" onclick="runDemoAnalysis()">
+                    Демо-анализ
+                </button>
+            </div>
+        
+            <div class="processing-row">
+                <div class="processing-left">
+                    <div id="loader" class="loader hidden">
+                        <span></span>
+                    </div>
+            
+
+            
+                    <button id="cancelBtn" class="cancel-inline hidden" onclick="cancelAnalysis()">
+                        Отменить
+                    </button>
+                </div>
+            </div>
+
+    </section>
+
+    <section id="results" class="card hidden">
+        <div class="section-title">
+            <span>2</span>
+            <h2>Результаты анализа</h2>
+        </div>
+
+        <div class="info-box">
+            Выполнена обработка видеопотока. Система сформировала траекторию движения автомобиля
+            и рассчитала демонстрационные оценочные показатели.
+        </div>
+
+        <h3>Параметры видео</h3>
+        <table>
+            <tbody id="videoInfoTable"></tbody>
+        </table>
+
+        <h3>Итоговые оценки</h3>
+        <table>
+            <tbody id="scoresTable"></tbody>
+        </table>
+
+        <button id="downloadResultBtn" onclick="downloadAnalysisResult()" class="secondary-button hidden">
+            Скачать результат JSON
+        </button>
+        
+        <h3>Графики движения</h3>
+        
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h4>Скорость по кадрам</h4>
+                <canvas id="speedChart"></canvas>
+            </div>
+        
+            <div class="chart-card">
+                <h4>Изменение направления</h4>
+                <canvas id="angleChart"></canvas>
+            </div>
+        </div>
+
+        <div class="info-box secondary">
+            Оценка заезда формируется на основе анализа траектории движения автомобиля,
+            изменения направления движения и стабильности перемещения объекта между кадрами.
+        </div>
+
+        <h3>Методика расчёта оценок</h3>
+
+        <div class="metrics-explanation">
+
+            <div class="metric-card">
+                <h4>Траектория</h4>
+                <p>
+                    Оценивается плавность движения и соответствие траектории ожидаемой форме дрифта.
+                    Резкие скачки координат снижают оценку.
+                </p>
+            </div>
+
+            <div class="metric-card">
+                <h4>Угол заноса</h4>
+                <p>
+                    Приближённо определяется по изменению направления движения между соседними точками.
+                    Чем больше отклонение от прямой траектории, тем выше оценка.
+                </p>
+            </div>
+
+            <div class="metric-card">
+                <h4>Стабильность</h4>
+                <p>
+                    Оценивается равномерность движения: отсутствие резких скачков координат и шумов детекции.
+                </p>
+            </div>
+
+            <div class="metric-card">
+                <h4>Скорость</h4>
+                <p>
+                    Рассчитывается по изменению положения объекта между кадрами.
+                    Более динамичное движение увеличивает оценку.
+                </p>
+            </div>
+
+        </div>
+
+        <h3>Детализация расчёта оценки</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Критерий</th>
+                    <th>Балл</th>
+                    <th>
+                        Вес
+                        <span class="tooltip">?
+                            <span class="tooltip-text">Коэффициент влияния критерия на итоговую оценку.</span>
+                        </span>
+                    </th>
+                    <th>
+                        Вклад
+                        <span class="tooltip">?
+                            <span class="tooltip-text">Часть итоговой оценки: балл критерия × вес критерия.</span>
+                        </span>
+                    </th>
+                </tr>
+            </thead>
+            <tbody id="detailedScoresTable"></tbody>
+        </table>
+    </section>
+
+    <section id="trajectory" class="card hidden">
+        <div class="section-title">
+            <span>3</span>
+            <h2>Визуализация траектории</h2>
+        </div>
+
+        <p class="hint">
+            Точки показывают положение объекта на выбранных кадрах. Линия отображает восстановленную траекторию движения.
+        </p>
+
+        <canvas id="trajectoryCanvas" width="760" height="430"></canvas>
+
+        <div class="trajectory-details">
+            <div class="trajectory-control">
+                <label for="trajectorySlider">Выбор точки траектории</label>
+                <input type="range" id="trajectorySlider" min="0" value="0">
+                <p id="selectedPointInfo"></p>
+            </div>
+        
+            <div class="selected-frame-block">
+                <h4>Кадр выбранной точки</h4>
+                <img id="selectedFrameImage" src="" alt="Кадр выбранной точки">
+            </div>
+        </div>
+    </section>
+
+    <section class="card hidden" id="detectionBlock">
+        <div class="section-title">
+            <span>4</span>
+            <h2>Кадры с детекцией автомобиля</h2>
+        </div>
+
+        <p class="hint">
+            На кадрах показаны области, которые система определила как анализируемый движущийся объект.
+        </p>
+
+        <div id="screenshots" class="screenshots"></div>
+    </section>
+
+    <section class="card hidden" id="processedVideoBlock">
+        <div class="section-title">
+            <span>5</span>
+            <h2>Обработанное видео</h2>
+        </div>
+
+        <p class="hint">
+            В обработанном видео зелёной рамкой выделяется объект, по которому строится траектория.
+            Подпись содержит номер кадра и координаты центра обнаруженной области.
+        </p>
+
+        <div class="video-shell">
+            <video id="processedVideo" class="processed-video"></video>
+        
+            <button class="video-play-button" onclick="toggleProcessedVideo()">
+                ▶
+            </button>
+        
+            <div class="video-caption">
+                <span>Processed video</span>
+                <span id="videoState">Готово к просмотру</span>
+            </div>
+        </div>
+
+        <a id="downloadVideoBtn" class="btn-secondary" download>
+            Скачать обработанное видео
+        </a>
+
+    </section>
+
+    <section class="card hidden" id="formulaBlock">
+        <div class="section-title">
+            <span>6</span>
+            <h2>Формула итоговой оценки</h2>
+        </div>
+
+        <div class="formula">
+            Итоговая оценка = Траектория × 0.4 + Угол заноса × 0.3 + Стабильность × 0.2 + Скорость × 0.1
+        </div>
+    </section>
+
+    <section id="limitations" class="card hidden">
+        <div class="section-title">
+            <span>7</span>
+            <h2>Ограничения прототипа</h2>
+        </div>
+
+        <div class="limitations">
+            <p>— используется базовая детекция движения без обучения нейросетевой модели;</p>
+            <p>— оценочные показатели являются демонстрационными;</p>
+            <p>— точность зависит от качества видео, освещения и наличия других движущихся объектов;</p>
+            <p>— для промышленной версии требуется обучение модели на реальных видеозаписях дрифт-заездов.</p>
+        </div>
+    </section>
+
+</main>
+
+<div id="imageModal" class="modal hidden" onclick="closeImageModal()">
+    <span class="modal-close" onclick="closeImageModal()">×</span>
+    <img id="modalImage" onclick="event.stopPropagation()">
+</div>
+
+<script src="script.js"></script>
+
+
+<div id="customModal" class="modal hidden">
+
+    <div class="modal-content">
+
+        <div class="modal-title">Ошибка анализа</div>
+
+        <div id="modalText" class="modal-text"></div>
+
+        <button onclick="closeModal()" class="modal-button">Закрыть</button>
+
+    </div>
+
+</div>
+
+<div id="toast" class="toast">
+    <button class="toast-close" onclick="hideToast()">×</button>
+    <div class="toast-title">Уведомление</div>
+    <div id="toastText" class="toast-text"></div>
+</div>
+
+
+<footer class="footer">
+    <div class="footer-content">
+
+        <div class="footer-block">
+            <h4>Drift Vision Assistant</h4>
+            <p>
+                Демонстрационный веб-прототип системы анализа дрифт-заездов
+                на основе обработки видеопотока.
+            </p>
+        </div>
+
+        <div class="footer-block">
+            <h4>Проект</h4>
+            <p>Владислав Прокопов</p>
+            <p>ВКР / практическая часть, 2026</p>
+        </div>
+
+        <div class="footer-block">
+            <h4>Технологии</h4>
+            <p>FastAPI, OpenCV, JavaScript</p>
+        </div>
+
+    </div>
+
+    <div class="footer-bottom">
+    
+    </div>
+</footer>
+
+</body>
+</html>
